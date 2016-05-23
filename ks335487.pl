@@ -7,7 +7,7 @@ verify(N, FileName) :-
     initState(Data, N, InitState),
     getInstrList(Data, Program),
     step(Program, InitState, 0, OutState),
-    write(OutState),
+    write(OutState), nl,
     step(Program, OutState, 0, OutState2),
     write(OutState2).
 
@@ -96,9 +96,6 @@ currentInstr(Program, InState, PrId, Instr) :-
 % [kolejcna instrukcja dla proc]
 
 % executeInstr(Program, InState, PrId, assign(Var, Exp), OutState) :-
-%
-% executeInstr(Program, InState, PrId, goto(Val), OutState) :-
-%
 % executeInstr(Program, InState, PrId, condGoto(BoolExp, Val), OutState) :-
 
 executeInstr([Vars, Arrs, Orders], PrId, goto(InstrNum), OutState) :-
@@ -110,6 +107,58 @@ executeInstr([Vars, Arrs, Orders], PrId, sekcja, OutState) :-
     InstrNum2 is InstrNum+1,
     replace0(Orders, PrId, InstrNum2, Orders2),
     OutState = [Vars, Arrs, Orders2].
+
+executeInstr([Vars, Arrs, Orders], PrId, assign(Var, Exp), OutState) :-
+    evaluateExp(Vars, Arrs, PrId, Exp, Val),
+    OutState = [Vars, Arrs, Orders]. % TODO remove
+
+evaluateArthmeticExp(State, PrId, (LOp + ROp), Val) :-
+    evalutateSimpleExp(State, PrId, LOp, LVal),
+    evalutateSimpleExp(State, PrId, ROp, RVal),
+    Val is LVal + RVal.
+
+evaluateArthmeticExp(State, PrId, (LOp - ROp), Val) :-
+    evalutateSimpleExp(State, PrId, LOp, LVal),
+    evalutateSimpleExp(State, PrId, ROp, RVal),
+    Val is LVal - RVal.
+
+evaluateArthmeticExp(State, PrId, (LOp * ROp), Val) :-
+    evalutateSimpleExp(State, PrId, LOp, LVal),
+    evalutateSimpleExp(State, PrId, ROp, RVal),
+    Val is LVal * RVal.
+
+evaluateArthmeticExp(State, PrId, (LOp / ROp), Val) :-
+    evalutateSimpleExp(State, PrId, LOp, LVal),
+    evalutateSimpleExp(State, PrId, ROp, RVal),
+    Val is LVal / RVal.
+
+evalutateSimpleExp(_, _, Val, Val) :-
+    number(Val).
+
+evalutateSimpleExp([Vars, Arrs, Orders], PrId, arr(Ident, Exp), Val) :-
+    evaluateArthmeticExp([Vars, Arrs, Orders], PrId, Exp, Ind),
+    getArrAtInd(Arrs, Ident, Ind, Val).
+
+evalutateSimpleExp([Vars, _, _], PrId, Ident, Val) :-
+    ( Ident = pid ->
+        Val is PrId
+    ;
+        getVar(Vars, Ident, Val)
+    ).
+
+getVar([(Ident2, Val2)|T], Ident, Val) :-
+    ( Ident2 = Ident ->
+        Val is Val2
+    ;
+        getVar(T, Ident, Val)
+    ).
+
+getArrAtInd([(Ident2, Vals)|T], Ident, Ind, Val) :-
+    ( Ident2 = Ident ->
+        nth0(Ind, Vals, Val)
+    ;
+        getArrAtInd(T, Ident, Ind, Val)
+    ).
 
 % replace0(+List, +Ind, +Elt, -List2)
 replace0([_|T], 0, X, [X|T]).
