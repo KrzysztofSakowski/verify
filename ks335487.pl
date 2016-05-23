@@ -4,8 +4,12 @@
 verify(N, FileName) :-
     validateProcAmt(N),
     readProgram(FileName, Data),
-    write(Data), nl,
-    initState(Data, N, Out).
+    initState(Data, N, InitState),
+    getInstrList(Data, Program),
+    step(Program, InitState, 0, OutState),
+    write(OutState),
+    step(Program, OutState, 0, OutState2),
+    write(OutState2).
 
 validateProcAmt(N) :-
     ( N =< 0 ->
@@ -29,23 +33,22 @@ parseProgram(Str, Data) :-
     read(Str, Ins),
     Data = [Vars, Arrs, Ins].
 
+getInstrList(Program, Ins) :-
+    nth1(3, Program, program(Ins)).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% TODO opisac
 % [(zmienna, wartość)]
 % [(tablica, [lista_wartosci])]
 % [kolejcna instrukcja dla proc]
-
-% getVarList(Program, Vars) :-
-
-
-getInstrList(Program, Ins) :-
-    nth1(3, Program, program(Ins)).
 
 % initState(+Program, +N, -StanPoczątkowy)
 initState(Program, N, InitState) :-
     initVariablesWithZeros(Program, InitVars),
     initArrsWithZeros(Program, N, InitArrs),
-    generateListWithZeros(N, 1, InitInstr),
-    write([InitVars, InitArrs, InitInstr]), nl,
+    generateListWith(N, 1, InitInstr),
+    write([InitVars, InitArrs, InitInstr]), nl, % TODO remove
     InitState = [InitVars, InitArrs, InitInstr].
 
 initVariablesWithZeros(Program, InitVars) :-
@@ -74,9 +77,43 @@ generateListWith(N, Val, [X|Xs]) :-
     M is N-1,
     generateListWith(M, Val, Xs).
 
-
-
-
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % step(+Program, +StanWe, ?PrId, -StanWy)
+step(Program, InState, PrId, OutState) :-
+    currentInstr(Program, InState, PrId, Instr),
+    write(Instr), nl,
+    executeInstr(InState, PrId, Instr, OutState).
+
+currentInstr(Program, InState, PrId, Instr) :-
+    nth1(3, InState, OrderList),
+    nth0(PrId, OrderList, InstrNum),
+    nth1(InstrNum, Program, Instr).
+
+% TODO opisac
+% [(zmienna, wartość)]
+% [(tablica, [lista_wartosci])]
+% [kolejcna instrukcja dla proc]
+
+% executeInstr(Program, InState, PrId, assign(Var, Exp), OutState) :-
+%
+% executeInstr(Program, InState, PrId, goto(Val), OutState) :-
+%
+% executeInstr(Program, InState, PrId, condGoto(BoolExp, Val), OutState) :-
+
+executeInstr([Vars, Arrs, Orders], PrId, goto(InstrNum), OutState) :-
+    replace0(Orders, PrId, InstrNum, Orders2),
+    OutState = [Vars, Arrs, Orders2].
+
+executeInstr([Vars, Arrs, Orders], PrId, sekcja, OutState) :-
+    nth0(PrId, Orders, InstrNum),
+    InstrNum2 is InstrNum+1,
+    replace0(Orders, PrId, InstrNum2, Orders2),
+    OutState = [Vars, Arrs, Orders2].
+
+% replace0(+List, +Ind, +Elt, -List2)
+replace0([_|T], 0, X, [X|T]).
+replace0([H|T], I, X, [H|T2]):-
+    I > 0,
+    I2 is I-1,
+    replace(T, I2, X, T2).
