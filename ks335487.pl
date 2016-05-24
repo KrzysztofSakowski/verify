@@ -93,7 +93,7 @@ generateListWith(N, Val, [X|Xs]) :-
 % step(+Program, +StanWe, ?PrId, -StanWy)
 step(Program, InState, PrId, OutState) :-
     currentInstr(Program, InState, PrId, Instr),
-    write(Instr), nl,
+    write(Instr), nl, nl, % TODO remove
     executeInstr(InState, PrId, Instr, OutState).
 
 currentInstr(Program, InState, PrId, Instr) :-
@@ -106,8 +106,15 @@ currentInstr(Program, InState, PrId, Instr) :-
 % [(tablica, [lista_wartosci])]
 % [kolejcna instrukcja dla proc]
 
-% executeInstr(Program, InState, PrId, condGoto(BoolExp, Val), OutState) :-
-% incementOrder(Orders, PrId, Orders2),
+executeInstr([Vars, Arrs, Orders], PrId, condGoto(BoolExp, ValExp), OutState) :-
+    ( evaluateBoolExp(State, PrId, BoolExp) ->
+        evaluateArthmeticExp(State, PrId, ValExp, Val),
+        replace0(Orders, PrId, Val, Orders2),
+        OutState = [Vars, Arrs, Orders2]
+    ;
+        incementOrder(Orders, PrId, Orders2),
+        OutState = [Vars, Arrs, Orders2]
+    ).
 
 executeInstr([Vars, Arrs, Orders], PrId, goto(InstrNum), OutState) :-
     replace0(Orders, PrId, InstrNum, Orders2),
@@ -129,6 +136,22 @@ executeInstr([Vars, Arrs, Orders], PrId, assign(arr(Ident, IndExp), ValExp), Out
     setArrAtInd(Arrs, Ident, Ind, Val, Arrs2),
     incementOrder(Orders, PrId, Orders2),
     OutState = [Vars, Arrs2, Orders2].
+
+evaluateBoolExp(State, PrId, (LOp < ROp)) :-
+    evalutateSimpleExp(State, PrId, LOp, LVal),
+    evalutateSimpleExp(State, PrId, ROp, RVal),
+    LVal < RVal.
+
+evaluateBoolExp(State, PrId, (LOp = ROp)) :-
+    evalutateSimpleExp(State, PrId, LOp, LVal),
+    evalutateSimpleExp(State, PrId, ROp, RVal),
+    LVal is RVal.
+
+% TODO
+% evaluateBoolExp(State, PrId, (LOp (<>) ROp)) :-
+%     evalutateSimpleExp(State, PrId, LOp, LVal),
+%     evalutateSimpleExp(State, PrId, ROp, RVal),
+%      LVal =\= RVal.
 
 incementOrder(Orders, PrId, Orders2) :-
     nth0(PrId, Orders, InstrNum),
