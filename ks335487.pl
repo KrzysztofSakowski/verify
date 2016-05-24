@@ -6,10 +6,22 @@ verify(N, FileName) :-
     readProgram(FileName, Data),
     initState(Data, N, InitState),
     getInstrList(Data, Program),
-    step(Program, InitState, 0, OutState),
-    write(OutState), nl,
-    step(Program, OutState, 0, OutState2),
-    write(OutState2).
+
+    xStep(Program, InitState, 10).
+
+    % step(Program, InitState, 0, OutState),
+    % write(OutState), nl,
+    % step(Program, OutState, 0, OutState2),
+    % write(OutState2).
+
+xStep(_, InState, 0) :- % TODO remove
+    write(InState), nl.
+
+xStep(Program, InState, Amt) :-
+    write(InState), nl,
+    step(Program, InState, 0, OutState),
+    Amt2 is Amt-1,
+    xStep(Program, OutState, Amt2).
 
 validateProcAmt(N) :-
     ( N =< 0 ->
@@ -48,7 +60,6 @@ initState(Program, N, InitState) :-
     initVariablesWithZeros(Program, InitVars),
     initArrsWithZeros(Program, N, InitArrs),
     generateListWith(N, 1, InitInstr),
-    write([InitVars, InitArrs, InitInstr]), nl, % TODO remove
     InitState = [InitVars, InitArrs, InitInstr].
 
 initVariablesWithZeros(Program, InitVars) :-
@@ -95,22 +106,47 @@ currentInstr(Program, InState, PrId, Instr) :-
 % [(tablica, [lista_wartosci])]
 % [kolejcna instrukcja dla proc]
 
-% executeInstr(Program, InState, PrId, assign(Var, Exp), OutState) :-
 % executeInstr(Program, InState, PrId, condGoto(BoolExp, Val), OutState) :-
+% incementOrder(Orders, PrId, Orders2),
 
 executeInstr([Vars, Arrs, Orders], PrId, goto(InstrNum), OutState) :-
     replace0(Orders, PrId, InstrNum, Orders2),
     OutState = [Vars, Arrs, Orders2].
 
 executeInstr([Vars, Arrs, Orders], PrId, sekcja, OutState) :-
-    nth0(PrId, Orders, InstrNum),
-    InstrNum2 is InstrNum+1,
-    replace0(Orders, PrId, InstrNum2, Orders2),
+    incementOrder(Orders, PrId, Orders2),
     OutState = [Vars, Arrs, Orders2].
 
-executeInstr([Vars, Arrs, Orders], PrId, assign(Var, Exp), OutState) :-
-    evaluateExp(Vars, Arrs, PrId, Exp, Val),
-    OutState = [Vars, Arrs, Orders]. % TODO remove
+executeInstr([Vars, Arrs, Orders], PrId, assign(Ident, Exp), OutState) :-
+    evaluateArthmeticExp([Vars, Arrs, Orders], PrId, Exp, Val),
+    setVar(Vars, Ident, Val, Vars2),
+    incementOrder(Orders, PrId, Orders2),
+    OutState = [Vars2, Arrs, Orders2].
+
+executeInstr([Vars, Arrs, Orders], PrId, assign(arr(Ident, IndExp), ValExp), OutState) :-
+    evaluateArthmeticExp([Vars, Arrs, Orders], PrId, ValExp, Val),
+    evaluateArthmeticExp([Vars, Arrs, Orders], PrId, IndExp, Ind),
+    setArrAtInd(Arrs, Ident, Ind, Val, Arrs2),
+    incementOrder(Orders, PrId, Orders2),
+    OutState = [Vars, Arrs2, Orders2].
+
+incementOrder(Orders, PrId, Orders2) :-
+    nth0(PrId, Orders, InstrNum),
+    InstrNum2 is InstrNum+1,
+    replace0(Orders, PrId, InstrNum2, Orders2).
+
+% TODO red cut? add cuts?
+setArrAtInd([(Ident, Vals)|T], Ident, Ind, Val, [(Ident, Vals2)|T]) :-
+    replace0(Vals, Ind, Val, Vals2).
+
+setArrAtInd([_|T], Ident, Ind, Val, [_|T2]) :-
+    setArrAtInd(T, Ident, Ind, Val, T2).
+
+setVar([(Ident, _)|T], Ident, Val, [(Ident, Val)|T]).
+
+setVar([_|T], Ident, Val, [_|T2]) :-
+    setVar(T, Ident, Val, T2).
+
 
 evaluateArthmeticExp(State, PrId, (LOp + ROp), Val) :-
     evalutateSimpleExp(State, PrId, LOp, LVal),
@@ -131,6 +167,9 @@ evaluateArthmeticExp(State, PrId, (LOp / ROp), Val) :-
     evalutateSimpleExp(State, PrId, LOp, LVal),
     evalutateSimpleExp(State, PrId, ROp, RVal),
     Val is LVal / RVal.
+
+evaluateArthmeticExp(State, PrId, Exp, Val) :-
+    evalutateSimpleExp(State, PrId, Exp, Val).
 
 evalutateSimpleExp(_, _, Val, Val) :-
     number(Val).

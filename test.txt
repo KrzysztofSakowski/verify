@@ -1,3 +1,3 @@
 vars([x]).
 arrays([]).
-program([sekcja, assign(x, 1- pid), goto(1), assign(x, pid), sekcja, goto(1)]).
+program([sekcja, assign(x, x-1), goto(1), assign(x, pid), sekcja, goto(1)]).
