@@ -89,7 +89,7 @@ iterateProc(ProcId, Program, graph(Nodes, Visited, Ancestors, ProcAmt), Graph3) 
         Visited2 = Visited,
         Ancestors2 = Ancestors
     ;
-        Nodes2 = [Node2|Nodes],
+        append(Nodes, [Node2], Nodes2),
         Visited2 = [Node2|Visited],
         Ancestors2 = [(Node2, (Node, ProcId))|Ancestors]
     ),
