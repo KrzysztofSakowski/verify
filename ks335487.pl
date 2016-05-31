@@ -6,9 +6,7 @@ verify(N, FileName) :-
     readProgram(FileName, Data),
     initState(Data, N, InitState),
     getInstrList(Data, Program),
-
-    Graph = graph([InitState], [InitState], [], N), % TODO init ancestor
-    bfs(Program, Graph). % TODO ignoring comp results?
+    bfs(Program, graph([InitState], [InitState], [], N)). % TODO ignoring comp results? % TODO init ancestor
 
     % xStep(Program, InitState, 10).
 
@@ -16,6 +14,8 @@ verify(N, FileName) :-
     % write(OutState), nl,
     % step(Program, OutState, 0, OutState2),
     % write(OutState2).
+
+    % TODO change state represenation to term
 
 % xStep(_, InState, 0) :- % TODO remove
 %     write(InState), nl.
@@ -58,10 +58,10 @@ bfs(Program, Graph) :-
     arg(1, Graph, Nodes),
     arg(4, Graph, ProcAmt),
     arg(3, Graph, Ancestors),
+    arg(2, Graph, Visited),
     head(Nodes, Node),
-
-    write('bfs: '), write(Node), nl,
-    fail,
+    length(Visited, Size),
+    write('bfs: '), write(Size), nl,
 
     ( isStateUnsafe(Program, Node, ProcAmt, 0) ->
         write('Program jest niepoprawny: stan nr '),
@@ -76,14 +76,8 @@ bfs(Program, Graph) :-
         bfs(Program, Graph2)
     ).
 
-bfs(_, [], _, _, _) :-
-    write('Program jest poprawny (bezpieczny).'), nl.
-
-    % for 0:ProcAmt-1
-    %     step(Node, NewNode)
-    %     if (not visited)
-    %         add to NodeList
-    %         ancestor Node Node
+bfs(_, graph([], _, _, _)) :-
+    write('Program jest poprawny (bezpieczny).'), nl. % TODO cut
 
 iterateProc(ProcId, Program, graph(Nodes, Visited, Ancestors, ProcAmt), Graph3) :-
     head(Nodes, Node),
@@ -94,7 +88,7 @@ iterateProc(ProcId, Program, graph(Nodes, Visited, Ancestors, ProcAmt), Graph3) 
         append(Ancestors, [], Ancestors2)
     ;
         append(Nodes, [Node2], Nodes2),
-        append(Visited, Node, Visited2),
+        append(Visited, [Node], Visited2),
         append(Ancestors, [(Node2, (Node, ProcId))], Ancestors2)
     ),
 
