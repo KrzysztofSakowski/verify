@@ -7,7 +7,10 @@ verify(N, FileName) :-
     initState(Data, N, InitState),
     getInstrList(Data, Program),
 
-    xStep(Program, InitState, 10).
+    Graph = graph([InitState], [InitState], [], N), % TODO init ancestor
+    bfs(Program, Graph). % TODO ignoring comp results?
+
+    % xStep(Program, InitState, 10).
 
     % step(Program, InitState, 0, OutState),
     % write(OutState), nl,
@@ -47,6 +50,79 @@ parseProgram(Str, Data) :-
 
 getInstrList(Program, Ins) :-
     nth1(3, Program, program(Ins)).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  0 : ProcAmt-1  TODO remove
+% bfs(+Program, +graph(Nodes, Visited, Ancestors, ProcAmt))
+bfs(Program, Graph) :-
+    arg(1, Graph, Nodes),
+    arg(4, Graph, ProcAmt),
+    head(Nodes, Node),
+
+    ( isStateUnsafe(Program, Node, ProcAmt, 0) ->
+        write('Program jest niepoprawny: stan nr '),
+        write('42'), % TODO
+        write(' nie jest bezpieczny.'), nl,
+        % TODO print report, Ancestors
+        !
+    ;
+        iterateProc(0, Program, Graph, Graph2),
+        bfs(Program, Graph2)
+    ).
+
+bfs(_, [], _, _, _) :-
+    write('Program jest poprawny (bezpieczny).'), nl.
+
+    % for 0:ProcAmt-1
+    %     step(Node, NewNode)
+    %     if (not visited)
+    %         add to NodeList
+    %         ancestor Node Node
+
+iterateProc(ProcId, Program, graph(Nodes, Visited, Ancestors, ProcAmt), Graph3) :-
+    head(Nodes, Node),
+
+    write(ProcId), nl,
+
+    step(Program, Node, ProcId, Node2),
+    ( member(Node2, Visited)  ->
+        append(Nodes, [], Nodes2),
+        append(Visited, [], Visited2)
+    ;
+        append(Nodes, [Node2], Nodes2),
+        append(Visited, Node, Visited2)
+        % TODO append Ancestors Ancestors = [(State, Ancestor)|T]
+        % (Node2, Node)
+    ),
+    tail(Nodes2, Nodes3),
+    Graph2 = graph(Nodes3, Visited2, Ancestors, ProcAmt), % TODO change to Ancestors2
+
+    ( ProcId+1 is ProcAmt ->
+        Graph2 = Graph3
+    ;
+        ProcId2 is ProcId +1,
+        iterateProc(ProcId2, Program, Graph2, Graph3)
+    ).
+
+isStateUnsafe(Program, State, ProcAmt, PrId) :-
+    PrId2 is PrId+1,
+    PrId2 < ProcAmt,
+    ( currentInstr(Program, State, PrId, sekcja) ->
+        !,
+        isStateUnsafe2(Program, State, ProcAmt, PrId2)
+    ;
+        isStateUnsafe(Program, State, ProcAmt, PrId2)
+    ).
+
+isStateUnsafe2(Program, State, ProcAmt, PrId) :-
+    ( currentInstr(Program, State, PrId, sekcja) ->
+        true
+    ;
+        PrId2 is PrId+1,
+        PrId2 < ProcAmt,
+        isStateUnsafe2(Program, State, ProcAmt, PrId2)
+    ).
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -227,4 +303,4 @@ replace0([_|T], 0, X, [X|T]).
 replace0([H|T], I, X, [H|T2]):-
     I > 0,
     I2 is I-1,
-    replace(T, I2, X, T2).
+    replace0(T, I2, X, T2).
