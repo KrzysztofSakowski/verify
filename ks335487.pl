@@ -6,7 +6,8 @@ verify(N, FileName) :-
     readProgram(FileName, Data),
     initState(Data, N, InitState),
     getInstrList(Data, Program),
-    bfs(Program, graph([InitState], [InitState], [], N)). % TODO ignoring comp results? % TODO init ancestor
+    write([InitState]),
+    bfs(Program, graph([InitState], [InitState], [], N)).  % TODO init ancestor
 
     % xStep(Program, InitState, 10).
 
@@ -57,11 +58,12 @@ getInstrList(Program, Ins) :-
 bfs(Program, Graph) :-
     arg(1, Graph, Nodes),
     arg(4, Graph, ProcAmt),
-    arg(3, Graph, Ancestors),
     arg(2, Graph, Visited),
+    arg(3, Graph, Ancestors),
     head(Nodes, Node),
-    length(Visited, Size),
-    write('bfs: '), write(Size), nl,
+
+    length(Visited, Size), % TODO remove
+    write('bfs: '), write(Size), write(' '), nl,
 
     ( isStateUnsafe(Program, Node, ProcAmt, 0) ->
         write('Program jest niepoprawny: stan nr '),
@@ -83,13 +85,13 @@ iterateProc(ProcId, Program, graph(Nodes, Visited, Ancestors, ProcAmt), Graph3) 
     head(Nodes, Node),
     step(Program, Node, ProcId, Node2),
     ( member(Node2, Visited)  ->
-        append(Nodes, [], Nodes2),
-        append(Visited, [], Visited2),
-        append(Ancestors, [], Ancestors2)
+        Nodes2 = Nodes,
+        Visited2 = Visited,
+        Ancestors2 = Ancestors
     ;
-        append(Nodes, [Node2], Nodes2),
-        append(Visited, [Node2], Visited2),
-        append(Ancestors, [(Node2, (Node, ProcId))], Ancestors2)
+        Nodes2 = [Node2|Nodes],
+        Visited2 = [Node2|Visited],
+        Ancestors2 = [(Node2, (Node, ProcId))|Ancestors]
     ),
 
     ( ProcAmt is ProcId+1 ->
@@ -102,7 +104,6 @@ iterateProc(ProcId, Program, graph(Nodes, Visited, Ancestors, ProcAmt), Graph3) 
     ).
 
 isStateUnsafe(Program, State, ProcAmt, PrId) :-
-    % write('isStateUnsafe: '), write(State), nl, TODO remove
     PrId2 is PrId+1,
     PrId2 < ProcAmt,
     ( currentInstr(Program, State, PrId, sekcja) ->
@@ -123,13 +124,11 @@ isStateUnsafe2(Program, State, ProcAmt, PrId) :-
 
 getAncestors(Node, Ancestors, Acc, Path) :-
     ( getAncestor(Ancestors, Node, (Ancestor, PrId)) ->
-        append([(Ancestor, PrId)], Acc, Acc2),
+        Acc2 = [(Ancestor, PrId)|Acc],
         getAncestors(Ancestor, Ancestors, Acc2, Path)
     ;
         Path = Acc
     ).
-
-
 
 getAncestor([(Ident2, Val2)|T], Ident, Val) :-
     ( Ident2 = Ident ->
@@ -138,11 +137,11 @@ getAncestor([(Ident2, Val2)|T], Ident, Val) :-
         getAncestor(T, Ident, Val)
     ).
 
-writeWithNl([H|T]) :- % TODO remove
-    write(H), nl,
-    writeWithNl(T).
-
-writeWithNl([]).
+% writeWithNl([H|T]) :- % TODO remove
+%     write(H), nl,
+%     writeWithNl(T).
+%
+% writeWithNl([]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
