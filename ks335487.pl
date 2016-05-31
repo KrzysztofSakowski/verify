@@ -88,7 +88,7 @@ iterateProc(ProcId, Program, graph(Nodes, Visited, Ancestors, ProcAmt), Graph3) 
         append(Ancestors, [], Ancestors2)
     ;
         append(Nodes, [Node2], Nodes2),
-        append(Visited, [Node], Visited2),
+        append(Visited, [Node2], Visited2),
         append(Ancestors, [(Node2, (Node, ProcId))], Ancestors2)
     ),
 
