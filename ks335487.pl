@@ -17,14 +17,14 @@ verify(N, FileName) :-
     % step(Program, OutState, 0, OutState2),
     % write(OutState2).
 
-xStep(_, InState, 0) :- % TODO remove
-    write(InState), nl.
-
-xStep(Program, InState, Amt) :-
-    write(InState), nl,
-    step(Program, InState, 0, OutState),
-    Amt2 is Amt-1,
-    xStep(Program, OutState, Amt2).
+% xStep(_, InState, 0) :- % TODO remove
+%     write(InState), nl.
+%
+% xStep(Program, InState, Amt) :-
+%     write(InState), nl,
+%     step(Program, InState, 0, OutState),
+%     Amt2 is Amt-1,
+%     xStep(Program, OutState, Amt2).
 
 validateProcAmt(N) :-
     ( N =< 0 ->
@@ -57,13 +57,19 @@ getInstrList(Program, Ins) :-
 bfs(Program, Graph) :-
     arg(1, Graph, Nodes),
     arg(4, Graph, ProcAmt),
+    arg(3, Graph, Ancestors),
     head(Nodes, Node),
+
+    write('bfs: '), write(Node), nl,
+    fail,
 
     ( isStateUnsafe(Program, Node, ProcAmt, 0) ->
         write('Program jest niepoprawny: stan nr '),
         write('42'), % TODO
         write(' nie jest bezpieczny.'), nl,
         % TODO print report, Ancestors
+        getAncestors(Node, Ancestors, [Node], Path),
+        writeWithNl(Path),
         !
     ;
         iterateProc(0, Program, Graph, Graph2),
@@ -81,30 +87,28 @@ bfs(_, [], _, _, _) :-
 
 iterateProc(ProcId, Program, graph(Nodes, Visited, Ancestors, ProcAmt), Graph3) :-
     head(Nodes, Node),
-
-    write(ProcId), nl,
-
     step(Program, Node, ProcId, Node2),
     ( member(Node2, Visited)  ->
         append(Nodes, [], Nodes2),
-        append(Visited, [], Visited2)
+        append(Visited, [], Visited2),
+        append(Ancestors, [], Ancestors2)
     ;
         append(Nodes, [Node2], Nodes2),
-        append(Visited, Node, Visited2)
-        % TODO append Ancestors Ancestors = [(State, Ancestor)|T]
-        % (Node2, Node)
+        append(Visited, Node, Visited2),
+        append(Ancestors, [(Node2, (Node, ProcId))], Ancestors2)
     ),
-    tail(Nodes2, Nodes3),
-    Graph2 = graph(Nodes3, Visited2, Ancestors, ProcAmt), % TODO change to Ancestors2
 
-    ( ProcId+1 is ProcAmt ->
-        Graph2 = Graph3
+    ( ProcAmt is ProcId+1 ->
+        tail(Nodes2, Nodes3),
+        Graph3 = graph(Nodes3, Visited2, Ancestors2, ProcAmt)
     ;
-        ProcId2 is ProcId +1,
+        ProcId2 is ProcId+1,
+        Graph2 = graph(Nodes2, Visited2, Ancestors2, ProcAmt),
         iterateProc(ProcId2, Program, Graph2, Graph3)
     ).
 
 isStateUnsafe(Program, State, ProcAmt, PrId) :-
+    % write('isStateUnsafe: '), write(State), nl, TODO remove
     PrId2 is PrId+1,
     PrId2 < ProcAmt,
     ( currentInstr(Program, State, PrId, sekcja) ->
@@ -123,6 +127,28 @@ isStateUnsafe2(Program, State, ProcAmt, PrId) :-
         isStateUnsafe2(Program, State, ProcAmt, PrId2)
     ).
 
+getAncestors(Node, Ancestors, Acc, Path) :-
+    ( getAncestor(Ancestors, Node, (Ancestor, PrId)) ->
+        append([(Ancestor, PrId)], Acc, Acc2),
+        getAncestors(Ancestor, Ancestors, Acc2, Path)
+    ;
+        Path = Acc
+    ).
+
+
+
+getAncestor([(Ident2, Val2)|T], Ident, Val) :-
+    ( Ident2 = Ident ->
+        Val = Val2
+    ;
+        getAncestor(T, Ident, Val)
+    ).
+
+writeWithNl([H|T]) :- % TODO remove
+    write(H), nl,
+    writeWithNl(T).
+
+writeWithNl([]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -169,7 +195,7 @@ generateListWith(N, Val, [X|Xs]) :-
 % step(+Program, +StanWe, ?PrId, -StanWy)
 step(Program, InState, PrId, OutState) :-
     currentInstr(Program, InState, PrId, Instr),
-    write(Instr), nl, nl, % TODO remove
+    % write(Instr), nl, nl, % TODO remove
     executeInstr(InState, PrId, Instr, OutState).
 
 currentInstr(Program, InState, PrId, Instr) :-
@@ -180,14 +206,13 @@ currentInstr(Program, InState, PrId, Instr) :-
 % TODO opisac
 % [(zmienna, wartość)]
 % [(tablica, [lista_wartosci])]
-% [kolejcna instrukcja dla proc]
+% [kolejcna instrukcja dla proc] evaluateBoolExp([[(k,1)],[(chce,[1,1])],[5,3]], 1, arr(chce, 1-pid) = 0)
 
 executeInstr([Vars, Arrs, Orders], PrId, condGoto(BoolExp, ValExp), OutState) :-
-    ( evaluateBoolExp(State, PrId, BoolExp) ->
-        evaluateArthmeticExp(State, PrId, ValExp, Val),
+    ( evaluateBoolExp([Vars, Arrs, Orders], PrId, BoolExp) ->
+        evaluateArthmeticExp([Vars, Arrs, Orders], PrId, ValExp, Val),
         replace0(Orders, PrId, Val, Orders2),
-        OutState = [Vars, Arrs, Orders2]
-    ;
+        OutState = [Vars, Arrs, Orders2]    ;
         incementOrder(Orders, PrId, Orders2),
         OutState = [Vars, Arrs, Orders2]
     ).
