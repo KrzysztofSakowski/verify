@@ -137,11 +137,11 @@ getAncestor([(Ident2, Val2)|T], Ident, Val) :-
         getAncestor(T, Ident, Val)
     ).
 
-% writeWithNl([H|T]) :- % TODO remove
-%     write(H), nl,
-%     writeWithNl(T).
-%
-% writeWithNl([]).
+writeWithNl([H|T]) :- % TODO remove
+    write(H), nl,
+    writeWithNl(T).
+
+writeWithNl([]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
