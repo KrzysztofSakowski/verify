@@ -1,14 +1,20 @@
 % Krzysztof Sakowski
 :- ensure_loaded([library(lists)]).
-% TODO yes if error?
+
 verify(ProcAmt, FileName) :-
     validateProcAmt(ProcAmt),
     readProgram(FileName, Vars, Arrs, Program),
     initState(Vars, Arrs, ProcAmt, InitState),
 
-    Graph = graph([InitState], [InitState], [], ProcAmt)
-    bfs(Program, Graph).  % TODO init ancestor
+    FirstStateId is 1,
 
+    Graph = graph([(FirstStateId, InitState)],
+            [InitState], [], ProcAmt, FirstStateId),
+
+    bfs(Program, Graph).
+
+    % TODO init ancestor
+    % TODO yes if error?
     % TODO change state represenation to term
 
 validateProcAmt(N) :-
@@ -30,59 +36,67 @@ readProgram(FileName, Vars, Arrs, Instrs) :-
 
  readProgram(FileName, _) :-
     format('Error: brak pliku o nazwie - ~p~n', [FileName]),
-    !, fail.
-
-% getInstrList(Program, Ins) :-
-%     nth1(3, Program, program(Ins)).
+    !, fail. % TODO?
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  0 : ProcAmt-1  TODO remove
-% bfs(+Program, +graph(Nodes, Visited, Ancestors, ProcAmt))
+
+% Sekcja przechodząca po grafie stanów przy pomocy algorytmu BFS
+
+% bfs(+Program, +graph(NodesToVisit, Visited, Ancestors, ProcAmt, CurStateId)) % TODO odpisac strukture
 bfs(Program, Graph) :-
     arg(1, Graph, Nodes),
     arg(4, Graph, ProcAmt),
-    arg(2, Graph, Visited),
     arg(3, Graph, Ancestors),
-    head(Nodes, Node),
+    head(Nodes, (StateId, Node)),
 
+    arg(2, Graph, Visited),
     length(Visited, Size), % TODO remove
     write('bfs: '), write(Size), write(' '), nl,
 
     ( isStateUnsafe(Program, Node, ProcAmt, 0) ->
-        write('Program jest niepoprawny: stan nr '),
-        write('42'), % TODO
-        write(' nie jest bezpieczny.'), nl,
-        % TODO print report, Ancestors
+        format("Program jest niepoprawny: stan nr ~p nie jest bezpieczny.~n",
+                [StateId]),
+
+                % Niepoprawny przeplot:
+                % Proces 1: 1
+                % Proces 0: 1
+                % Procesy w sekcji: 1, 0.
+
         getAncestors(Node, Ancestors, [Node], Path),
-        writeWithNl(Path),
+        % writeWithNl(Path),
         !
     ;
         iterateProc(0, Program, Graph, Graph2),
         bfs(Program, Graph2)
     ).
 
-bfs(_, graph([], _, _, _)) :-
-    write('Program jest poprawny (bezpieczny).'), nl. % TODO cut
+bfs(_, graph([], _, _, _, _)) :-
+    write('Program jest poprawny (bezpieczny).'), nl. % TODO cut?
 
-iterateProc(ProcId, Program, graph(Nodes, Visited, Ancestors, ProcAmt), Graph3) :-
-    head(Nodes, Node),
+iterateProc(ProcId, Program,
+        graph(Nodes, Visited, Ancestors, ProcAmt, CurStateId),
+        Graph3) :-
+
+    head(Nodes, (_, Node)),
     step(Program, Node, ProcId, Node2),
     ( member(Node2, Visited)  ->
         Nodes2 = Nodes,
         Visited2 = Visited,
-        Ancestors2 = Ancestors
+        Ancestors2 = Ancestors,
+        NextStateId is CurStateId
     ;
-        append(Nodes, [Node2], Nodes2),
+        NextStateId is CurStateId+1,
+        append(Nodes, [(NextStateId, Node2)], Nodes2),
         Visited2 = [Node2|Visited],
         Ancestors2 = [(Node2, (Node, ProcId))|Ancestors]
     ),
 
     ( ProcAmt is ProcId+1 ->
         tail(Nodes2, Nodes3),
-        Graph3 = graph(Nodes3, Visited2, Ancestors2, ProcAmt)
+        Graph3 = graph(Nodes3, Visited2, Ancestors2, ProcAmt, NextStateId)
     ;
         ProcId2 is ProcId+1,
-        Graph2 = graph(Nodes2, Visited2, Ancestors2, ProcAmt),
+        Graph2 = graph(Nodes2, Visited2, Ancestors2, ProcAmt, NextStateId),
         iterateProc(ProcId2, Program, Graph2, Graph3)
     ).
 
@@ -120,18 +134,15 @@ getAncestor([(Ident2, Val2)|T], Ident, Val) :-
         getAncestor(T, Ident, Val)
     ).
 
-writeWithNl([H|T]) :- % TODO remove
-    write(H), nl,
-    writeWithNl(T).
-
-writeWithNl([]).
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% TODO opisac
-% [(zmienna, wartość)]
-% [(tablica, [lista_wartosci])]
-% [kolejcna instrukcja dla proc]
+% Sekcja generująca stan początkowy
+%
+% Stan reprenetowany jest przez trzy-elementową listę [Vars, Arrs, Orders]]
+% Vars to lista par (NAZWA_ZMIENNEJ, WARTOŚĆ)
+% Arrs to lista par postaci (NAZWA_TABLICY, LISTA_N_WARTOŚCI)
+% Orders to lista długości liczby procesów zawierają nr kolejnej instrukcji
+% dla każdego procesu
 
 initState(Vars, Arrs, ProcAmt, InitState) :-
     initVariablesWithZeros(Vars, InitVars),
@@ -159,6 +170,8 @@ generateListWith(N, Val, [X|Xs]) :-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% Sekcja wykonująca instrukcje
+
 % step(+Program, +StanWe, ?PrId, -StanWy)
 step(Program, InState, PrId, OutState) :-
     currentInstr(Program, InState, PrId, Instr),
@@ -173,7 +186,8 @@ executeInstr([Vars, Arrs, Orders], PrId, condGoto(BoolExp, ValExp), OutState) :-
     ( evaluateBoolExp([Vars, Arrs, Orders], PrId, BoolExp) ->
         evaluateArthmeticExp([Vars, Arrs, Orders], PrId, ValExp, Val),
         replace0(Orders, PrId, Val, Orders2),
-        OutState = [Vars, Arrs, Orders2]    ;
+        OutState = [Vars, Arrs, Orders2]
+    ;
         incementOrder(Orders, PrId, Orders2),
         OutState = [Vars, Arrs, Orders2]
     ).
@@ -199,6 +213,33 @@ executeInstr([Vars, Arrs, Orders], PrId, assign(arr(Ident, IndExp), ValExp), Out
     incementOrder(Orders, PrId, Orders2),
     OutState = [Vars, Arrs2, Orders2].
 
+incementOrder(Orders, PrId, Orders2) :-
+    nth0(PrId, Orders, InstrNum),
+    InstrNum2 is InstrNum+1,
+    replace0(Orders, PrId, InstrNum2, Orders2).
+
+setArrAtInd([(Ident, Vals)|T], Ident, Ind, Val, [(Ident, Vals2)|T]) :-
+    replace0(Vals, Ind, Val, Vals2).
+
+setArrAtInd([_|T], Ident, Ind, Val, [_|T2]) :-
+    setArrAtInd(T, Ident, Ind, Val, T2).
+
+setVar([(Ident, _)|T], Ident, Val, [(Ident, Val)|T]).
+
+setVar([_|T], Ident, Val, [_|T2]) :-
+    setVar(T, Ident, Val, T2).
+
+% replace0(+List, +Ind, +Elt, -List2)
+replace0([_|T], 0, X, [X|T]).
+replace0([H|T], I, X, [H|T2]):-
+    I > 0,
+    I2 is I-1,
+    replace0(T, I2, X, T2).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Sekcja ewaluująca wyrażenia logiczne
+
 evaluateBoolExp(State, PrId, (LOp < ROp)) :-
     evalutateSimpleExp(State, PrId, LOp, LVal),
     evalutateSimpleExp(State, PrId, ROp, RVal),
@@ -215,23 +256,9 @@ evaluateBoolExp(State, PrId, (LOp = ROp)) :-
 %     evalutateSimpleExp(State, PrId, ROp, RVal),
 %     LVal =\= RVal.
 
-incementOrder(Orders, PrId, Orders2) :-
-    nth0(PrId, Orders, InstrNum),
-    InstrNum2 is InstrNum+1,
-    replace0(Orders, PrId, InstrNum2, Orders2).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% TODO red cut? add cuts?
-setArrAtInd([(Ident, Vals)|T], Ident, Ind, Val, [(Ident, Vals2)|T]) :-
-    replace0(Vals, Ind, Val, Vals2).
-
-setArrAtInd([_|T], Ident, Ind, Val, [_|T2]) :-
-    setArrAtInd(T, Ident, Ind, Val, T2).
-
-setVar([(Ident, _)|T], Ident, Val, [(Ident, Val)|T]).
-
-setVar([_|T], Ident, Val, [_|T2]) :-
-    setVar(T, Ident, Val, T2).
-
+% Sekcja ewaluująca wyrażenia
 
 evaluateArthmeticExp(State, PrId, (LOp + ROp), Val) :-
     evalutateSimpleExp(State, PrId, LOp, LVal),
@@ -283,10 +310,3 @@ getArrAtInd([(Ident2, Vals)|T], Ident, Ind, Val) :-
     ;
         getArrAtInd(T, Ident, Ind, Val)
     ).
-
-% replace0(+List, +Ind, +Elt, -List2)
-replace0([_|T], 0, X, [X|T]).
-replace0([H|T], I, X, [H|T2]):-
-    I > 0,
-    I2 is I-1,
-    replace0(T, I2, X, T2).
