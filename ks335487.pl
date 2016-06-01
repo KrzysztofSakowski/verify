@@ -1,6 +1,6 @@
 % Krzysztof Sakowski
-:- ensure_loaded([library(lists), library(file_systems)]). % TODO file_systems lib?
-
+:- ensure_loaded([library(lists)]).
+% TODO yes if error?
 verify(N, FileName) :-
     validateProcAmt(N),
     readProgram(FileName, Data),
@@ -9,45 +9,35 @@ verify(N, FileName) :-
     write([InitState]),
     bfs(Program, graph([InitState], [InitState], [], N)).  % TODO init ancestor
 
-    % xStep(Program, InitState, 10).
-
-    % step(Program, InitState, 0, OutState),
-    % write(OutState), nl,
-    % step(Program, OutState, 0, OutState2),
-    % write(OutState2).
-
     % TODO change state represenation to term
-
-% xStep(_, InState, 0) :- % TODO remove
-%     write(InState), nl.
-%
-% xStep(Program, InState, Amt) :-
-%     write(InState), nl,
-%     step(Program, InState, 0, OutState),
-%     Amt2 is Amt-1,
-%     xStep(Program, OutState, Amt2).
 
 validateProcAmt(N) :-
     ( N =< 0 ->
-        write('Error: parametr 0 powinien byc liczba > 0'), nl, !, fail
+        format('Error: parametr 0 powinien byc liczba > 0~n'),
+        !,
+        fail
     ;
         true
     ).
 
 readProgram(FileName, Data) :-
-    ( file_exists(FileName) ->
-        open(FileName, read, Str),
-        parseProgram(Str, Data),
-        close(Str)
-    ;
-        write('Error: brak pliku o nazwie - '), write(FileName), nl, !, fail
-    ).
+    set_prolog_flag(fileerrors, off),
+    see(FileName),
+    !,
+    % read(vars(Vars)),
+    % read(arrays(Arrs)),
+    % read(program(Instrs)),
+    read(Vars),
+    read(Arrs),
+    read(Instrs),
+    seen,
+    write(Vars),nl,
+    Data = [Vars, Arrs, Instrs].
 
-parseProgram(Str, Data) :-
-    read(Str, Vars),
-    read(Str, Arrs),
-    read(Str, Ins),
-    Data = [Vars, Arrs, Ins].
+ readProgram(FileName, _) :-
+    format('Error: brak pliku o nazwie - ~p~n', [FileName]),
+    !,
+    fail.
 
 getInstrList(Program, Ins) :-
     nth1(3, Program, program(Ins)).
@@ -188,18 +178,12 @@ generateListWith(N, Val, [X|Xs]) :-
 % step(+Program, +StanWe, ?PrId, -StanWy)
 step(Program, InState, PrId, OutState) :-
     currentInstr(Program, InState, PrId, Instr),
-    % write(Instr), nl, nl, % TODO remove
     executeInstr(InState, PrId, Instr, OutState).
 
 currentInstr(Program, InState, PrId, Instr) :-
     nth1(3, InState, OrderList),
     nth0(PrId, OrderList, InstrNum),
     nth1(InstrNum, Program, Instr).
-
-% TODO opisac
-% [(zmienna, wartość)]
-% [(tablica, [lista_wartosci])]
-% [kolejcna instrukcja dla proc] evaluateBoolExp([[(k,1)],[(chce,[1,1])],[5,3]], 1, arr(chce, 1-pid) = 0)
 
 executeInstr([Vars, Arrs, Orders], PrId, condGoto(BoolExp, ValExp), OutState) :-
     ( evaluateBoolExp([Vars, Arrs, Orders], PrId, BoolExp) ->
@@ -245,7 +229,7 @@ evaluateBoolExp(State, PrId, (LOp = ROp)) :-
 % evaluateBoolExp(State, PrId, (LOp (<>) ROp)) :-
 %     evalutateSimpleExp(State, PrId, LOp, LVal),
 %     evalutateSimpleExp(State, PrId, ROp, RVal),
-%      LVal =\= RVal.
+%     LVal =\= RVal.
 
 incementOrder(Orders, PrId, Orders2) :-
     nth0(PrId, Orders, InstrNum),
