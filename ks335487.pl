@@ -1,46 +1,39 @@
 % Krzysztof Sakowski
 :- ensure_loaded([library(lists)]).
 % TODO yes if error?
-verify(N, FileName) :-
-    validateProcAmt(N),
-    readProgram(FileName, Data),
-    initState(Data, N, InitState),
-    getInstrList(Data, Program),
-    write([InitState]),
-    bfs(Program, graph([InitState], [InitState], [], N)).  % TODO init ancestor
+verify(ProcAmt, FileName) :-
+    validateProcAmt(ProcAmt),
+    readProgram(FileName, Vars, Arrs, Program),
+    initState(Vars, Arrs, ProcAmt, InitState),
+
+    Graph = graph([InitState], [InitState], [], ProcAmt)
+    bfs(Program, Graph).  % TODO init ancestor
 
     % TODO change state represenation to term
 
 validateProcAmt(N) :-
     ( N =< 0 ->
         format('Error: parametr 0 powinien byc liczba > 0~n'),
-        !,
-        fail
+        !, fail
     ;
         true
     ).
 
-readProgram(FileName, Data) :-
+readProgram(FileName, Vars, Arrs, Instrs) :-
     set_prolog_flag(fileerrors, off),
     see(FileName),
     !,
-    % read(vars(Vars)),
-    % read(arrays(Arrs)),
-    % read(program(Instrs)),
-    read(Vars),
-    read(Arrs),
-    read(Instrs),
-    seen,
-    write(Vars),nl,
-    Data = [Vars, Arrs, Instrs].
+    read(vars(Vars)),
+    read(arrays(Arrs)),
+    read(program(Instrs)),
+    seen.
 
  readProgram(FileName, _) :-
     format('Error: brak pliku o nazwie - ~p~n', [FileName]),
-    !,
-    fail.
+    !, fail.
 
-getInstrList(Program, Ins) :-
-    nth1(3, Program, program(Ins)).
+% getInstrList(Program, Ins) :-
+%     nth1(3, Program, program(Ins)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %  0 : ProcAmt-1  TODO remove
@@ -140,31 +133,22 @@ writeWithNl([]).
 % [(tablica, [lista_wartosci])]
 % [kolejcna instrukcja dla proc]
 
-% initState(+Program, +N, -StanPoczątkowy)
-initState(Program, N, InitState) :-
-    initVariablesWithZeros(Program, InitVars),
-    initArrsWithZeros(Program, N, InitArrs),
-    generateListWith(N, 1, InitInstr),
+initState(Vars, Arrs, ProcAmt, InitState) :-
+    initVariablesWithZeros(Vars, InitVars),
+    initArrsWithZeros(Arrs, ProcAmt, InitArrs),
+    generateListWith(ProcAmt, 1, InitInstr),
     InitState = [InitVars, InitArrs, InitInstr].
 
-initVariablesWithZeros(Program, InitVars) :-
-    nth1(1, Program, vars(Vars)),
-    initVariablesWithZeros2(Vars, InitVars).
-
-initVariablesWithZeros2([], []).
-initVariablesWithZeros2([X|Xs], [Y|Ys]) :-
+initVariablesWithZeros([], []).
+initVariablesWithZeros([X|Xs], [Y|Ys]) :-
     Y = (X, 0),
-    initVariablesWithZeros2(Xs, Ys).
+    initVariablesWithZeros(Xs, Ys).
 
-initArrsWithZeros(Program, N, InitArrs) :-
-    nth1(2, Program, arrays(Arrs)),
-    initArrsWithZeros2(Arrs, N, InitArrs).
-
-initArrsWithZeros2([], _, []).
-initArrsWithZeros2([X|Xs], N, [Y|Ys]) :-
-    generateListWith(N, 0, List),
+initArrsWithZeros([], _, []).
+initArrsWithZeros([X|Xs], ProcAmt, [Y|Ys]) :-
+    generateListWith(ProcAmt, 0, List),
     Y = (X, List),
-    initArrsWithZeros2(Xs, N, Ys).
+    initArrsWithZeros(Xs, ProcAmt, Ys).
 
 % generateListWith(+Size, +Value, -List)
 generateListWith(0, _, []).
