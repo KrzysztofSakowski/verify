@@ -1,5 +1,6 @@
 % Krzysztof Sakowski
 :- ensure_loaded([library(lists)]).
+:- op(700, xfx, [<>]).
 
 verify(ProcAmt, FileName) :-
     validateProcAmt(ProcAmt),
@@ -13,9 +14,7 @@ verify(ProcAmt, FileName) :-
 
     bfs(Program, Graph).
 
-    % TODO init ancestor
     % TODO yes if error?
-    % TODO change state represenation to term
 
 validateProcAmt(N) :-
     ( N =< 0 ->
@@ -48,7 +47,7 @@ readProgram(FileName, Vars, Arrs, Instrs) :-
 % Ancestors lista przodkow dla stanu w postaci (Node2, (Node, ProcId,InstrNum))
 %   Node2 to stan
 %   Node to jego przodek
-%   ProcId to id id procesu, który w wyniku wykonia instrukcji doprowadzil do
+%   ProcId to id id procesu, który w wyniku wykonia instrukcji doprowadził do
 %        tego stanu
 %   InstrNum to nr instrukcji, której wykonanie doprowadziło do teog stanu
 % ProcAmt ilość procesów
@@ -61,16 +60,12 @@ bfs(Program, Graph) :-
     arg(3, Graph, Ancestors),
     head(Nodes, (StateId, Node)),
 
-    % arg(2, Graph, Visited),
-    % length(Visited, Size), % TODO remove
-    % write('bfs: '), write(Size), write(' '), nl,
-
     ( isStateUnsafe(Program, Node, ProcAmt, 0) ->
         !,
         format("Program jest niepoprawny: stan nr ~p nie jest bezpieczny.~n",
                 [StateId]),
         format("Niepoprawny przeplot:~n", []),
-                % Procesy w sekcji: 1, 0.
+                % Procesy w sekcji: 1, 0. TODO
         getAncestors(Node, Ancestors, [], Path),
         writePath(Path)
     ;
@@ -84,9 +79,9 @@ bfs(_, graph([], _, _, _, _)) :-
 iterateProc(ProcId, Program,
         graph(Nodes, Visited, Ancestors, ProcAmt, CurStateId),
         Graph3) :-
-
     head(Nodes, (_, Node)),
     step(Program, Node, ProcId, Node2),
+
     ( member(Node2, Visited)  ->
         Nodes2 = Nodes,
         Visited2 = Visited,
@@ -143,9 +138,7 @@ getAncestor([(Ident2, Val2)|T], Ident, Val) :-
         getAncestor(T, Ident, Val)
     ).
 
-% getAncestor([], _, ) TODO
-
-writePath([(PrId, InstrNum)|T]) :- % TODO remove Ancestor?
+writePath([(PrId, InstrNum)|T]) :-
     format("Proces ~p: ~p~n", [PrId, InstrNum]),
     writePath(T).
 
@@ -242,12 +235,12 @@ incementOrder(Orders, PrId, Orders2) :-
 setArrAtInd([(Ident, Vals)|T], Ident, Ind, Val, [(Ident, Vals2)|T]) :-
     replace0(Vals, Ind, Val, Vals2).
 
-setArrAtInd([_|T], Ident, Ind, Val, [_|T2]) :-
+setArrAtInd([H|T], Ident, Ind, Val, [H|T2]) :-
     setArrAtInd(T, Ident, Ind, Val, T2).
 
 setVar([(Ident, _)|T], Ident, Val, [(Ident, Val)|T]).
 
-setVar([_|T], Ident, Val, [_|T2]) :-
+setVar([H|T], Ident, Val, [H|T2]) :-
     setVar(T, Ident, Val, T2).
 
 % replace0(+List, +Ind, +Elt, -List2)
@@ -271,11 +264,10 @@ evaluateBoolExp(State, PrId, (LOp = ROp)) :-
     evalutateSimpleExp(State, PrId, ROp, RVal),
     LVal is RVal.
 
-% TODO
-% evaluateBoolExp(State, PrId, (LOp (<>) ROp)) :-
-%     evalutateSimpleExp(State, PrId, LOp, LVal),
-%     evalutateSimpleExp(State, PrId, ROp, RVal),
-%     LVal =\= RVal.
+evaluateBoolExp(State, PrId, (LOp <> ROp)) :- %TODO
+    evalutateSimpleExp(State, PrId, LOp, LVal),
+    evalutateSimpleExp(State, PrId, ROp, RVal),
+    LVal =\= RVal.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

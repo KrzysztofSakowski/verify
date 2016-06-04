@@ -1,0 +1,13 @@
+vars([k, super]).
+arrays([chce]).
+program([
+    assign(arr(chce, pid), 1),
+    assign(k, pid),
+    condGoto(super = 0, 6),
+    condGoto(arr(chce, 1-pid) = 0, 6),
+    condGoto(k = pid, 4),
+    sekcja,
+    assign(arr(chce, pid), 0),
+    assign(super, 1),
+    goto(1)
+]).
