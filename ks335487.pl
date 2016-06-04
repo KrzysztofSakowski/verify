@@ -3,39 +3,31 @@
 :- op(700, xfx, [<>]).
 
 verify(ProcAmt, FileName) :-
-    validateProcAmt(ProcAmt),
-    readProgram(FileName, Vars, Arrs, Program),
-    initState(Vars, Arrs, ProcAmt, InitState),
-
-    FirstStateId is 1,
-
-    Graph = graph([(FirstStateId, InitState)],
-            [InitState], [], ProcAmt, FirstStateId),
-
-    bfs(Program, Graph).
-
-    % TODO yes if error?
-
-validateProcAmt(N) :-
-    ( N =< 0 ->
-        format("Error: parametr 0 powinien byc liczba > 0~n", []),
-        !, fail % TODO?
+    ( ProcAmt =< 0 ->
+        format("Error: parametr ~p powinien byc liczba > 0~n", [ProcAmt])
     ;
-        true
+        readProgram(FileName, ProcAmt)
     ).
 
-readProgram(FileName, Vars, Arrs, Instrs) :-
+readProgram(FileName, ProcAmt) :-
     set_prolog_flag(fileerrors, off),
     see(FileName),
     !,
     read(vars(Vars)),
     read(arrays(Arrs)),
-    read(program(Instrs)),
-    seen.
+    read(program(Program)),
+    seen,
+    validate(ProcAmt, Vars, Arrs, Program).
 
  readProgram(FileName, _) :-
-    format("Error: brak pliku o nazwie - ~p~n", [FileName]),
-    !, fail. % TODO?
+    format("Error: brak pliku o nazwie - ~p~n", [FileName]).
+
+validate(ProcAmt, Vars, Arrs, Program) :-
+    initState(Vars, Arrs, ProcAmt, InitState),
+    FirstStateId is 1,
+    Graph = graph([(FirstStateId, InitState)],
+            [InitState], [], ProcAmt, FirstStateId),
+    bfs(Program, Graph).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
