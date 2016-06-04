@@ -19,8 +19,8 @@ verify(ProcAmt, FileName) :-
 
 validateProcAmt(N) :-
     ( N =< 0 ->
-        format('Error: parametr 0 powinien byc liczba > 0~n'),
-        !, fail
+        format("Error: parametr 0 powinien byc liczba > 0~n", []),
+        !, fail % TODO?
     ;
         true
     ).
@@ -35,43 +35,51 @@ readProgram(FileName, Vars, Arrs, Instrs) :-
     seen.
 
  readProgram(FileName, _) :-
-    format('Error: brak pliku o nazwie - ~p~n', [FileName]),
+    format("Error: brak pliku o nazwie - ~p~n", [FileName]),
     !, fail. % TODO?
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Sekcja przechodząca po grafie stanów przy pomocy algorytmu BFS
 
-% bfs(+Program, +graph(NodesToVisit, Visited, Ancestors, ProcAmt, CurStateId)) % TODO odpisac strukture
+% Opis termu graph(NodesToVisit, Visited, Ancestors, ProcAmt, CurStateId)
+% NodesToVisit kolejka stanów do przetworzenia przez algorytm BFS
+% Visited lista przetworzonych stanów
+% Ancestors lista przodkow dla stanu w postaci (Node2, (Node, ProcId,InstrNum))
+%   Node2 to stan
+%   Node to jego przodek
+%   ProcId to id id procesu, który w wyniku wykonia instrukcji doprowadzil do
+%        tego stanu
+%   InstrNum to nr instrukcji, której wykonanie doprowadziło do teog stanu
+% ProcAmt ilość procesów
+% CurStateId numer przyznany dla ostanio przetworzonego stanu
+
+% bfs(+Program, +graph(NodesToVisit, Visited, Ancestors, ProcAmt, CurStateId))
 bfs(Program, Graph) :-
     arg(1, Graph, Nodes),
     arg(4, Graph, ProcAmt),
     arg(3, Graph, Ancestors),
     head(Nodes, (StateId, Node)),
 
-    arg(2, Graph, Visited),
-    length(Visited, Size), % TODO remove
-    write('bfs: '), write(Size), write(' '), nl,
+    % arg(2, Graph, Visited),
+    % length(Visited, Size), % TODO remove
+    % write('bfs: '), write(Size), write(' '), nl,
 
     ( isStateUnsafe(Program, Node, ProcAmt, 0) ->
+        !,
         format("Program jest niepoprawny: stan nr ~p nie jest bezpieczny.~n",
                 [StateId]),
-
-                % Niepoprawny przeplot:
-                % Proces 1: 1
-                % Proces 0: 1
+        format("Niepoprawny przeplot:~n", []),
                 % Procesy w sekcji: 1, 0.
-
-        getAncestors(Node, Ancestors, [Node], Path),
-        % writeWithNl(Path),
-        !
+        getAncestors(Node, Ancestors, [], Path),
+        writePath(Path)
     ;
         iterateProc(0, Program, Graph, Graph2),
         bfs(Program, Graph2)
     ).
 
 bfs(_, graph([], _, _, _, _)) :-
-    write('Program jest poprawny (bezpieczny).'), nl. % TODO cut?
+    format("Program jest poprawny (bezpieczny).~n", []).
 
 iterateProc(ProcId, Program,
         graph(Nodes, Visited, Ancestors, ProcAmt, CurStateId),
@@ -88,7 +96,8 @@ iterateProc(ProcId, Program,
         NextStateId is CurStateId+1,
         append(Nodes, [(NextStateId, Node2)], Nodes2),
         Visited2 = [Node2|Visited],
-        Ancestors2 = [(Node2, (Node, ProcId))|Ancestors]
+        currentInstrNum(Node, ProcId, InstrNum),
+        Ancestors2 = [(Node2, (Node, ProcId,InstrNum))|Ancestors]
     ),
 
     ( ProcAmt is ProcId+1 ->
@@ -120,8 +129,8 @@ isStateUnsafe2(Program, State, ProcAmt, PrId) :-
     ).
 
 getAncestors(Node, Ancestors, Acc, Path) :-
-    ( getAncestor(Ancestors, Node, (Ancestor, PrId)) ->
-        Acc2 = [(Ancestor, PrId)|Acc],
+    ( getAncestor(Ancestors, Node, (Ancestor, PrId, InstrNum)) ->
+        Acc2 = [(PrId, InstrNum)|Acc],
         getAncestors(Ancestor, Ancestors, Acc2, Path)
     ;
         Path = Acc
@@ -133,6 +142,14 @@ getAncestor([(Ident2, Val2)|T], Ident, Val) :-
     ;
         getAncestor(T, Ident, Val)
     ).
+
+% getAncestor([], _, ) TODO
+
+writePath([(PrId, InstrNum)|T]) :- % TODO remove Ancestor?
+    format("Proces ~p: ~p~n", [PrId, InstrNum]),
+    writePath(T).
+
+writePath([]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -177,9 +194,12 @@ step(Program, InState, PrId, OutState) :-
     currentInstr(Program, InState, PrId, Instr),
     executeInstr(InState, PrId, Instr, OutState).
 
-currentInstr(Program, InState, PrId, Instr) :-
-    nth1(3, InState, OrderList),
-    nth0(PrId, OrderList, InstrNum),
+currentInstrNum(State, PrId, InstrNum) :-
+    nth1(3, State, OrderList),
+    nth0(PrId, OrderList, InstrNum).
+
+currentInstr(Program, State, PrId, Instr) :-
+    currentInstrNum(State, PrId, InstrNum),
     nth1(InstrNum, Program, Instr).
 
 executeInstr([Vars, Arrs, Orders], PrId, condGoto(BoolExp, ValExp), OutState) :-
@@ -206,7 +226,8 @@ executeInstr([Vars, Arrs, Orders], PrId, assign(Ident, Exp), OutState) :-
     incementOrder(Orders, PrId, Orders2),
     OutState = [Vars2, Arrs, Orders2].
 
-executeInstr([Vars, Arrs, Orders], PrId, assign(arr(Ident, IndExp), ValExp), OutState) :-
+executeInstr([Vars, Arrs, Orders], PrId,
+        assign(arr(Ident, IndExp), ValExp), OutState) :-
     evaluateArthmeticExp([Vars, Arrs, Orders], PrId, ValExp, Val),
     evaluateArthmeticExp([Vars, Arrs, Orders], PrId, IndExp, Ind),
     setArrAtInd(Arrs, Ident, Ind, Val, Arrs2),
