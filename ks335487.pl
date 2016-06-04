@@ -60,14 +60,19 @@ bfs(Program, Graph) :-
     arg(3, Graph, Ancestors),
     head(Nodes, (StateId, Node)),
 
-    ( isStateUnsafe(Program, Node, ProcAmt, 0) ->
+    procInSection(Program, Node, ProcAmt, 0, [], ProcLst),
+    length(ProcLst, ProcInSectionAmt),
+
+    ( ProcInSectionAmt >= 2 ->
         !,
         format("Program jest niepoprawny: stan nr ~p nie jest bezpieczny.~n",
                 [StateId]),
         format("Niepoprawny przeplot:~n", []),
-                % Procesy w sekcji: 1, 0. TODO
         getAncestors(Node, Ancestors, [], Path),
-        writePath(Path)
+        writePath(Path),
+        format("Procesy w sekcji: ", []),
+        writeProcLst(ProcLst),
+        format(".~n",[])
     ;
         iterateProc(0, Program, Graph, Graph2),
         bfs(Program, Graph2)
@@ -104,24 +109,20 @@ iterateProc(ProcId, Program,
         iterateProc(ProcId2, Program, Graph2, Graph3)
     ).
 
-isStateUnsafe(Program, State, ProcAmt, PrId) :-
-    PrId2 is PrId+1,
-    PrId2 < ProcAmt,
+procInSection(Program, State, ProcAmt, PrId, Acc, ProcLst)  :-
     ( currentInstr(Program, State, PrId, sekcja) ->
-        !,
-        isStateUnsafe2(Program, State, ProcAmt, PrId2)
+        Acc2 = [PrId|Acc]
+        ;
+        Acc2 = Acc
+    ),
+
+    PrId2 is PrId+1,
+    ( PrId2 >= ProcAmt ->
+        ProcLst = Acc2
     ;
-        isStateUnsafe(Program, State, ProcAmt, PrId2)
+        procInSection(Program, State, ProcAmt, PrId2, Acc2, ProcLst)
     ).
 
-isStateUnsafe2(Program, State, ProcAmt, PrId) :-
-    ( currentInstr(Program, State, PrId, sekcja) ->
-        true
-    ;
-        PrId2 is PrId+1,
-        PrId2 < ProcAmt,
-        isStateUnsafe2(Program, State, ProcAmt, PrId2)
-    ).
 
 getAncestors(Node, Ancestors, Acc, Path) :-
     ( getAncestor(Ancestors, Node, (Ancestor, PrId, InstrNum)) ->
@@ -143,6 +144,18 @@ writePath([(PrId, InstrNum)|T]) :-
     writePath(T).
 
 writePath([]).
+
+writeProcLst(Lst) :-
+    head(Lst, Pr),
+    format("~p", [Pr]),
+    tail(Lst, TailLst),
+    writeProcLst2(TailLst).
+
+writeProcLst2([H|T]) :-
+    format(", ~p",[H]),
+    writeProcLst2(T).
+
+writeProcLst2([]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -264,7 +277,7 @@ evaluateBoolExp(State, PrId, (LOp = ROp)) :-
     evalutateSimpleExp(State, PrId, ROp, RVal),
     LVal is RVal.
 
-evaluateBoolExp(State, PrId, (LOp <> ROp)) :- %TODO
+evaluateBoolExp(State, PrId, (LOp <> ROp)) :-
     evalutateSimpleExp(State, PrId, LOp, LVal),
     evalutateSimpleExp(State, PrId, ROp, RVal),
     LVal =\= RVal.

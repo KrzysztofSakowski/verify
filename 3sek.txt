@@ -1,0 +1,6 @@
+vars([k, super]).
+arrays([chce]).
+program([
+    sekcja,
+    goto(1)
+]).
